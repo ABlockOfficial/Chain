@@ -100,15 +100,15 @@ impl iter::Sum for TokenAmount {
     }
 }
 
-/// Receipt asset struct
+/// Item asset struct
 #[derive(Default, Deserialize, Serialize, Debug, Clone, Eq, Ord, PartialEq, PartialOrd)]
-pub struct ReceiptAsset {
+pub struct ItemAsset {
     pub amount: u64,
     pub drs_tx_hash: Option<String>,
     pub metadata: Option<String>,
 }
 
-impl ReceiptAsset {
+impl ItemAsset {
     pub fn new(amount: u64, drs_tx_hash: Option<String>, metadata: Option<String>) -> Self {
         Self {
             amount,
@@ -129,12 +129,12 @@ pub struct DataAsset {
 ///
 /// * `Token`   - An asset struct representation of the ZNT token
 /// * `Data`    - A data asset
-/// * `Receipt` - A receipt for a payment. The value indicates the number of receipt assets
+/// * `Item` - A item for a payment. The value indicates the number of item assets
 #[derive(Deserialize, Serialize, Debug, Clone, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Asset {
     Token(TokenAmount),
     Data(DataAsset),
-    Receipt(ReceiptAsset),
+    Item(ItemAsset),
 }
 
 impl Default for Asset {
@@ -147,9 +147,9 @@ impl Asset {
     /// Modify `self` of `Asset` struct to obtain `drs_tx_hash`
     /// from either the asset itself or its corresponding `OutPoint`
     pub fn with_fixed_hash(mut self, out_point: &OutPoint) -> Self {
-        if let Asset::Receipt(ref mut receipt_asset) = self {
-            if receipt_asset.drs_tx_hash.is_none() {
-                receipt_asset.drs_tx_hash = Some(&out_point.t_hash).cloned();
+        if let Asset::Item(ref mut item_asset) = self {
+            if item_asset.drs_tx_hash.is_none() {
+                item_asset.drs_tx_hash = Some(&out_point.t_hash).cloned();
             }
         }
         self
@@ -160,7 +160,7 @@ impl Asset {
         match self {
             Asset::Token(_) => None,
             Asset::Data(_) => None, /* TODO: This will have to change */
-            Asset::Receipt(receipt) => receipt.drs_tx_hash.as_ref(),
+            Asset::Item(item) => item.drs_tx_hash.as_ref(),
         }
     }
 
@@ -168,7 +168,7 @@ impl Asset {
         match self {
             Asset::Token(_) => None,
             Asset::Data(_) => None,
-            Asset::Receipt(receipt) => receipt.metadata.as_ref(),
+            Asset::Item(item) => item.metadata.as_ref(),
         }
     }
 
@@ -176,7 +176,7 @@ impl Asset {
         match self {
             Asset::Token(_) => size_of::<TokenAmount>(),
             Asset::Data(d) => d.data.len(),
-            Asset::Receipt(_) => size_of::<u64>(),
+            Asset::Item(_) => size_of::<u64>(),
         }
     }
 
@@ -184,8 +184,8 @@ impl Asset {
         Asset::Token(TokenAmount(amount))
     }
 
-    pub fn receipt(amount: u64, drs_tx_hash: Option<String>, metadata: Option<String>) -> Self {
-        Asset::Receipt(ReceiptAsset::new(amount, drs_tx_hash, metadata))
+    pub fn item(amount: u64, drs_tx_hash: Option<String>, metadata: Option<String>) -> Self {
+        Asset::Item(ItemAsset::new(amount, drs_tx_hash, metadata))
     }
 
     /// Add an asset of the same variant to `self` asset.
@@ -193,7 +193,7 @@ impl Asset {
     ///
     /// ### Note
     ///
-    /// This function will return false for `Receipt` assets
+    /// This function will return false for `Item` assets
     /// getting added together that do not have the same `drs_tx_hash`
     ///
     /// ### Arguments
@@ -205,11 +205,11 @@ impl Asset {
                 *lhs_tokens += *rhs_tokens;
                 true
             }
-            (Asset::Receipt(lhs_receipts), Asset::Receipt(rhs_receipts)) => {
-                if lhs_receipts.drs_tx_hash != rhs_receipts.drs_tx_hash {
+            (Asset::Item(lhs_items), Asset::Item(rhs_items)) => {
+                if lhs_items.drs_tx_hash != rhs_items.drs_tx_hash {
                     return false;
                 }
-                lhs_receipts.amount += rhs_receipts.amount;
+                lhs_items.amount += rhs_items.amount;
                 true
             }
             _ => false,
@@ -227,11 +227,11 @@ impl Asset {
             (Asset::Token(lhs_token_amount), Asset::Token(rhs_token_amount)) => {
                 Some(lhs_token_amount >= rhs_token_amount)
             }
-            (Asset::Receipt(lhs_receipt), Asset::Receipt(rhs_receipt)) => {
-                if lhs_receipt.drs_tx_hash != rhs_receipt.drs_tx_hash {
+            (Asset::Item(lhs_item), Asset::Item(rhs_item)) => {
+                if lhs_item.drs_tx_hash != rhs_item.drs_tx_hash {
                     return None;
                 }
-                Some(lhs_receipt.amount >= rhs_receipt.amount)
+                Some(lhs_item.amount >= rhs_item.amount)
             }
             _ => None,
         }
@@ -253,14 +253,14 @@ impl Asset {
                     None
                 }
             }
-            (Asset::Receipt(lhs_receipts), Asset::Receipt(rhs_receipts)) => {
-                if lhs_receipts.amount > rhs_receipts.amount
-                    && lhs_receipts.drs_tx_hash == rhs_receipts.drs_tx_hash
+            (Asset::Item(lhs_items), Asset::Item(rhs_items)) => {
+                if lhs_items.amount > rhs_items.amount
+                    && lhs_items.drs_tx_hash == rhs_items.drs_tx_hash
                 {
-                    Some(Asset::receipt(
-                        lhs_receipts.amount - rhs_receipts.amount,
-                        lhs_receipts.drs_tx_hash.clone(),
-                        lhs_receipts.metadata.clone(),
+                    Some(Asset::item(
+                        lhs_items.amount - rhs_items.amount,
+                        lhs_items.drs_tx_hash.clone(),
+                        lhs_items.metadata.clone(),
                     ))
                 } else {
                     None
@@ -288,10 +288,10 @@ impl Asset {
     pub fn default_of_type(asset_type: &Self) -> Self {
         match asset_type {
             Self::Token(_) => Self::Token(Default::default()),
-            Self::Receipt(receipt) => Self::receipt(
+            Self::Item(item) => Self::item(
                 Default::default(),
-                receipt.drs_tx_hash.clone(),
-                receipt.metadata.clone(),
+                item.drs_tx_hash.clone(),
+                item.metadata.clone(),
             ),
             _ => panic!("Cannot create default of asset type: {:?}", asset_type),
         }
@@ -301,8 +301,8 @@ impl Asset {
         matches!(self, Asset::Token(_))
     }
 
-    pub fn is_receipt(&self) -> bool {
-        matches!(self, Asset::Receipt(_))
+    pub fn is_item(&self) -> bool {
+        matches!(self, Asset::Item(_))
     }
 
     pub fn is_empty(&self) -> bool {
@@ -319,40 +319,40 @@ impl Asset {
         }
     }
 
-    pub fn receipt_amount(&self) -> u64 {
+    pub fn item_amount(&self) -> u64 {
         match self {
-            Asset::Receipt(v) => v.amount,
+            Asset::Item(v) => v.amount,
             _ => 0,
         }
     }
 }
 
-/// `AssetValue` struct used to represent the a running total of `Token` and `Receipt` assets
+/// `AssetValue` struct used to represent the a running total of `Token` and `Item` assets
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AssetValues {
     pub tokens: TokenAmount,
-    // Note: Receipts from create transactions will have `drs_tx_hash` = `t_hash`
-    pub receipts: BTreeMap<String, u64>, /* `drs_tx_hash` - amount */
+    // Note: Items from create transactions will have `drs_tx_hash` = `t_hash`
+    pub items: BTreeMap<String, u64>, /* `drs_tx_hash` - amount */
 }
 
 impl ops::AddAssign for AssetValues {
     fn add_assign(&mut self, rhs: Self) {
         self.tokens += rhs.tokens;
-        add_btreemap(&mut self.receipts, rhs.receipts);
+        add_btreemap(&mut self.items, rhs.items);
     }
 }
 
 impl AssetValues {
-    pub fn new(tokens: TokenAmount, receipts: BTreeMap<String, u64>) -> Self {
-        Self { tokens, receipts }
+    pub fn new(tokens: TokenAmount, items: BTreeMap<String, u64>) -> Self {
+        Self { tokens, items }
     }
 
     pub fn token_u64(tokens: u64) -> Self {
         AssetValues::new(TokenAmount(tokens), Default::default())
     }
 
-    pub fn receipt(receipts: BTreeMap<String, u64>) -> Self {
-        AssetValues::new(TokenAmount(0), receipts)
+    pub fn item(items: BTreeMap<String, u64>) -> Self {
+        AssetValues::new(TokenAmount(0), items)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -360,18 +360,18 @@ impl AssetValues {
     }
 
     pub fn is_equal(&self, rhs: &AssetValues) -> bool {
-        self.tokens == rhs.tokens && self.receipts == rhs.receipts
+        self.tokens == rhs.tokens && self.items == rhs.items
     }
 
     // See if the running total is enough for a required `Asset` amount
     pub fn has_enough(&self, asset_required: &Asset) -> bool {
         match asset_required {
             Asset::Token(tokens) => self.tokens >= *tokens,
-            Asset::Receipt(receipts) => {
-                if let Some(drs_tx_hash) = &receipts.drs_tx_hash {
-                    self.receipts
+            Asset::Item(items) => {
+                if let Some(drs_tx_hash) = &items.drs_tx_hash {
+                    self.items
                         .get(drs_tx_hash)
-                        .map_or(false, |amount| *amount >= receipts.amount)
+                        .map_or(false, |amount| *amount >= items.amount)
                 } else {
                     false
                 }
@@ -384,12 +384,12 @@ impl AssetValues {
     pub fn update_add(&mut self, rhs: &Asset) {
         match rhs {
             Asset::Token(tokens) => self.tokens += *tokens,
-            Asset::Receipt(receipts) => {
-                if let Some(drs_tx_hash) = &receipts.drs_tx_hash {
-                    self.receipts
+            Asset::Item(items) => {
+                if let Some(drs_tx_hash) = &items.drs_tx_hash {
+                    self.items
                         .entry(drs_tx_hash.clone())
-                        .and_modify(|amount| *amount += receipts.amount)
-                        .or_insert(receipts.amount);
+                        .and_modify(|amount| *amount += items.amount)
+                        .or_insert(items.amount);
                 }
             }
             _ => {}
@@ -400,11 +400,11 @@ impl AssetValues {
     pub fn update_sub(&mut self, rhs: &Asset) {
         match rhs {
             Asset::Token(tokens) => self.tokens -= *tokens,
-            Asset::Receipt(receipts) => {
-                receipts.drs_tx_hash.as_ref().and_then(|drs_tx_hash| {
-                    self.receipts
+            Asset::Item(items) => {
+                items.drs_tx_hash.as_ref().and_then(|drs_tx_hash| {
+                    self.items
                         .get_mut(drs_tx_hash)
-                        .map(|amount| *amount -= receipts.amount)
+                        .map(|amount| *amount -= items.amount)
                 });
             }
             _ => {}

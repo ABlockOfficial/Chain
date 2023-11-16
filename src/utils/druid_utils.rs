@@ -115,7 +115,7 @@ mod tests {
         vec![alice_tx, bob_tx]
     }
 
-    /// Util function to create valid receipt-based payment tx's
+    /// Util function to create valid item-based payment tx's
     fn create_rb_payment_txs() -> (Transaction, Transaction) {
         // Arrange
         //
@@ -144,7 +144,7 @@ mod tests {
             let expectation = DruidExpectation {
                 from: from_addr.clone(),
                 to: alice_addr.clone(),
-                asset: Asset::receipt(1, Some("drs_tx_hash".to_owned()), None),
+                asset: Asset::item(1, Some("drs_tx_hash".to_owned()), None),
             };
 
             let mut tx = construct_rb_payments_send_tx(
@@ -222,7 +222,7 @@ mod tests {
     }
 
     #[test]
-    /// Checks that matching receipt-based payments are verified as such by the DDE verifier
+    /// Checks that matching item-based payments are verified as such by the DDE verifier
     fn should_pass_matching_rb_payment_valid() {
         let (send_tx, recv_tx) = create_rb_payment_txs();
         assert!(druid_expectations_are_met(
@@ -232,7 +232,7 @@ mod tests {
     }
 
     #[test]
-    /// Checks that receipt-based payments with non-matching DRUIDs fail
+    /// Checks that item-based payments with non-matching DRUIDs fail
     fn should_fail_rb_payment_druid_mismatch() {
         let (send_tx, mut recv_tx) = create_rb_payment_txs();
 
@@ -248,7 +248,7 @@ mod tests {
     }
 
     #[test]
-    /// Checks that receipt-based payments with non-matching addresses fail
+    /// Checks that item-based payments with non-matching addresses fail
     fn should_fail_rb_payment_addr_mismatch() {
         let (send_tx, mut recv_tx) = create_rb_payment_txs();
         recv_tx.outputs[0].script_public_key = Some("11145".to_string());
@@ -261,7 +261,7 @@ mod tests {
     }
 
     #[test]
-    /// Checks that receipt-based payments with non-matching value expectations fail
+    /// Checks that item-based payments with non-matching value expectations fail
     fn should_fail_rb_payment_value_expect_mismatch() {
         let (mut send_tx, recv_tx) = create_rb_payment_txs();
         send_tx.outputs[0].value = Asset::token_u64(10);
@@ -274,10 +274,10 @@ mod tests {
     }
 
     #[test]
-    /// Checks that receipt-based payments with non-matching DRS expectations fail
+    /// Checks that item-based payments with non-matching DRS expectations fail
     fn should_fail_rb_payment_drs_expect_mismatch() {
         let (send_tx, mut recv_tx) = create_rb_payment_txs();
-        recv_tx.outputs[0].value = Asset::receipt(1, Some("invalid_drs_tx_hash".to_string()), None);
+        recv_tx.outputs[0].value = Asset::item(1, Some("invalid_drs_tx_hash".to_string()), None);
 
         // Non-matching address expectation
         assert!(!druid_expectations_are_met(

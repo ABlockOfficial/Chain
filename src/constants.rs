@@ -28,7 +28,7 @@ pub const D_DISPLAY_PLACES: f64 = 25200.0;
 pub const TOTAL_TOKENS: u64 = D_DISPLAY_PLACES_U64 * 10000000000;
 
 /*------- ASSET CONSTANTS -------*/
-// The value to sign/verify for receipt-based payments
+// The value to sign/verify for item-based payments
 pub const RECEIPT_ACCEPT_VAL: &str = "PAYMENT_ACCEPT";
 
 /*------- BLOCK CONSTANTS --------*/

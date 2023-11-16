@@ -88,7 +88,7 @@ pub fn list_assets(db_path: String) {
                     let (asset_type, asset) = match &output.value {
                         Asset::Token(v) => ("Token", v.to_string()),
                         Asset::Data(v) => ("Data", String::from_utf8_lossy(&v.data).to_string()),
-                        Asset::Receipt(v) => ("Receipt", v.to_string()),
+                        Asset::Item(v) => ("Item", v.to_string()),
                     };
 
                     let drs_root_hash = match &output.drs_block_hash {

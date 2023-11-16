@@ -18,7 +18,7 @@ use std::collections::BTreeMap;
 /// exhibits a valid Script, but may or may not contain invalid `drs_tx_hash` or amount
 /// for a configuration of `TxIn`s and their corresponding `TxOut`s.
 ///
-/// `Receipt` assets may **NOT** be on-spent if the `TxIn` value has a different
+/// `Item` assets may **NOT** be on-spent if the `TxIn` value has a different
 /// `drs_tx_hash` value than the ongoing `TxOut` value
 ///
 /// ### Note:
@@ -39,8 +39,8 @@ pub fn generate_tx_with_ins_and_outs_assets(
         let tx_previous_out = OutPoint::new("tx_hash".to_owned(), tx.inputs.len() as i32);
         let tx_in_previous_out = match drs_tx_hash {
             Some(drs) => {
-                let receipt = Asset::receipt(*input_amount, Some(drs.to_string()), md.clone());
-                TxOut::new_asset(spk.clone(), receipt, None)
+                let item = Asset::item(*input_amount, Some(drs.to_string()), md.clone());
+                TxOut::new_asset(spk.clone(), item, None)
             }
             None => TxOut::new_token_amount(spk.clone(), TokenAmount(*input_amount), None),
         };
@@ -58,8 +58,8 @@ pub fn generate_tx_with_ins_and_outs_assets(
     for (output_amount, drs_tx_hash) in output_assets {
         let tx_out = match drs_tx_hash {
             Some(drs) => {
-                let receipt = Asset::receipt(*output_amount, Some(drs.to_string()), None);
-                TxOut::new_asset(spk.clone(), receipt, None)
+                let item = Asset::item(*output_amount, Some(drs.to_string()), None);
+                TxOut::new_asset(spk.clone(), item, None)
             }
             None => TxOut::new_token_amount(spk.clone(), TokenAmount(*output_amount), None),
         };

@@ -133,7 +133,7 @@ pub fn get_asset_signable_string(asset: &Asset) -> String {
             hex::encode(&data_asset.data),
             data_asset.amount
         ),
-        Asset::Receipt(receipt) => format!("Receipt:{}", receipt.amount),
+        Asset::Item(item) => format!("Item:{}", item.amount),
     }
 }
 
@@ -350,16 +350,16 @@ pub fn construct_create_tx(
     construct_tx_core(tx_ins, vec![tx_out])
 }
 
-/// Constructs a receipt data asset for use in accepting payments
-/// TODO: On compute, figure out a way to ease flow of receipts without issue for users
+/// Constructs a item data asset for use in accepting payments
+/// TODO: On compute, figure out a way to ease flow of items without issue for users
 ///
 /// ### Arguments
 ///
 /// * `block_num`           - Block number
 /// * `public_key`          - Public key for the output address
 /// * `secret_key`          - Corresponding secret key for signing data
-/// * `amount`              - Amount of receipt assets to create
-pub fn construct_receipt_create_tx(
+/// * `amount`              - Amount of item assets to create
+pub fn construct_item_create_tx(
     block_num: u64,
     public_key: PublicKey,
     secret_key: &SecretKey,
@@ -368,7 +368,7 @@ pub fn construct_receipt_create_tx(
     metadata: Option<String>,
 ) -> Transaction {
     let drs_tx_hash = drs_tx_hash_spec.get_drs_tx_hash();
-    let asset = Asset::receipt(amount, drs_tx_hash, metadata);
+    let asset = Asset::item(amount, drs_tx_hash, metadata);
     let receiver_address = construct_address(&public_key);
 
     let tx_ins = construct_create_tx_in(block_num, &asset, public_key, secret_key);
@@ -476,7 +476,7 @@ pub fn construct_tx_core(tx_ins: Vec<TxIn>, tx_outs: Vec<TxOut>) -> Transaction 
     }
 }
 
-/// Constructs a core receipt-based payment transaction
+/// Constructs a core item-based payment transaction
 ///
 /// ### Arguments
 ///
@@ -502,12 +502,12 @@ pub fn construct_rb_tx_core(
     tx
 }
 
-/// Constructs the "send" half of a receipt-based payment
+/// Constructs the "send" half of a item-based payment
 /// transaction
 ///
 /// ### Arguments
 ///
-/// * `receiver_address`    - Own address to receive receipt to
+/// * `receiver_address`    - Own address to receive item to
 /// * `amount`              - Amount of token to send
 /// * `locktime`            - Block height to lock the current transaction to
 pub fn construct_rb_payments_send_tx(
@@ -529,17 +529,17 @@ pub fn construct_rb_payments_send_tx(
     construct_rb_tx_core(tx_ins, tx_outs, druid, expectation)
 }
 
-/// Constructs the "receive" half of a receipt-based payment
+/// Constructs the "receive" half of a item-based payment
 /// transaction
 ///
 /// ### Arguments
 ///
-/// * `tx_ins`              - Inputs to receipt data asset
+/// * `tx_ins`              - Inputs to item data asset
 /// * `sender_address`      - Address of sender
 /// * `sender_send_addr`    - Input hash used by sender to send tokens
 /// * `own_address`         - Own address to receive tokens to
 /// * `amount`              - Number of tokens expected
-/// * `locktime`            - Block height below which the payment receipt is restricted. "0" means no locktime
+/// * `locktime`            - Block height below which the payment item is restricted. "0" means no locktime
 /// * `druid`               - The matching DRUID value
 pub fn construct_rb_receive_payment_tx(
     tx_ins: Vec<TxIn>,
@@ -551,7 +551,7 @@ pub fn construct_rb_receive_payment_tx(
     drs_tx_hash: Option<String>,
 ) -> Transaction {
     let out = TxOut {
-        value: Asset::receipt(1, drs_tx_hash, None),
+        value: Asset::item(1, drs_tx_hash, None),
         locktime,
         script_public_key: Some(sender_address),
         drs_block_hash: None, // this will need to change
@@ -640,7 +640,7 @@ pub fn construct_dde_tx(
 mod tests {
     use super::*;
     use crate::crypto::sign_ed25519::{self as sign, Signature};
-    use crate::primitives::asset::{AssetValues, ReceiptAsset};
+    use crate::primitives::asset::{AssetValues, ItemAsset};
     use crate::script::OpCodes;
     use crate::utils::script_utils::{tx_has_valid_p2sh_script, tx_outs_are_valid};
 
@@ -808,8 +808,8 @@ mod tests {
     }
 
     #[test]
-    /// Checks the validity of the metadata on-spend for receipts
-    fn test_receipt_onspend_metadata() {
+    /// Checks the validity of the metadata on-spend for items
+    fn test_item_onspend_metadata() {
         let (_pk, sk) = sign::gen_keypair();
         let (pk, _sk) = sign::gen_keypair();
         let t_hash = vec![0, 0, 0];
@@ -823,15 +823,15 @@ mod tests {
             address_version: Some(2),
         };
 
-        let drs_tx_hash = "receipt_tx_hash".to_string();
-        let receipt_asset_valid = ReceiptAsset::new(1000, Some(drs_tx_hash.clone()), None);
+        let drs_tx_hash = "item_tx_hash".to_string();
+        let item_asset_valid = ItemAsset::new(1000, Some(drs_tx_hash.clone()), None);
 
         let tx_ins = construct_payment_tx_ins(vec![tx_const]);
         let payment_tx_valid = construct_payment_tx(
             tx_ins,
             hex::encode(vec![0; 32]),
             Some(drs_block_hash),
-            Asset::Receipt(receipt_asset_valid),
+            Asset::Item(item_asset_valid),
             0,
         );
 
@@ -983,8 +983,8 @@ mod tests {
     }
 
     #[test]
-    // Creates a valid receipt based tx pair
-    fn test_construct_a_valid_receipt_tx_pair() {
+    // Creates a valid item based tx pair
+    fn test_construct_a_valid_item_tx_pair() {
         // Arrange
         //
         let amount = TokenAmount(33);
@@ -1012,7 +1012,7 @@ mod tests {
             let expectation = DruidExpectation {
                 from: from_addr.clone(),
                 to: alice_addr.clone(),
-                asset: Asset::receipt(1, Some("drs_tx_hash".to_owned()), None),
+                asset: Asset::item(1, Some("drs_tx_hash".to_owned()), None),
             };
 
             let mut tx = construct_rb_payments_send_tx(
@@ -1177,7 +1177,7 @@ mod tests {
         //
         let assets = vec![
             Asset::token_u64(1),
-            Asset::receipt(1, None, None),
+            Asset::item(1, None, None),
             Asset::Data(DataAsset {
                 data: vec![1, 2, 3],
                 amount: 1,
@@ -1194,7 +1194,7 @@ mod tests {
 
         let expected: Vec<String> = vec![
             "a5b2f5e8dcf824aee45b81294ff8049b680285b976cc6c8fa45eb070acfc5974".to_owned(),
-            "ce86f26f7f44f92630031f83e8d2f26c58e88eae40583c8760082edc7407991f".to_owned(),
+            "cb8f6cba3a62cfb7cd14245f19509b800da3dd446b6d902290efbcc91b3cee0d".to_owned(),
             "ab72cb41f1f18edfb9c5161029c9695de4d5eed1d323be18ddedfb66a2b32282".to_owned(),
         ];
 

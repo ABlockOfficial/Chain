@@ -4,7 +4,7 @@ use crate::crypto::sha3_256;
 use crate::crypto::sign_ed25519::{
     self as sign, PublicKey, Signature, ED25519_PUBLIC_KEY_LEN, ED25519_SIGNATURE_LEN,
 };
-use crate::primitives::asset::{Asset, AssetValues, ReceiptAsset, TokenAmount};
+use crate::primitives::asset::{Asset, AssetValues, ItemAsset, TokenAmount};
 use crate::primitives::druid::DruidExpectation;
 use crate::primitives::transaction::*;
 use crate::script::interface_ops::*;
@@ -40,9 +40,9 @@ pub fn tx_is_valid<'a>(
 ) -> bool {
     let mut tx_ins_spent: AssetValues = Default::default();
     // TODO: Add support for `Data` asset variant
-    // `Receipt` assets MUST have an a DRS value associated with them when they are getting on-spent
+    // `Item` assets MUST have an a DRS value associated with them when they are getting on-spent
     if tx.outputs.iter().any(|out| {
-        (out.value.is_receipt()
+        (out.value.is_item()
             && (out.value.get_drs_tx_hash().is_none() || out.value.get_metadata().is_some()))
     }) {
         error!("ON-SPENDING NEEDS EMPTY METADATA AND NON-EMPTY DRS SPECIFICATION");
@@ -126,9 +126,9 @@ pub fn tx_has_valid_create_script(script: &Script, asset: &Asset) -> bool {
     let mut it = script.stack.iter();
     let asset_hash = construct_tx_in_signable_asset_hash(asset);
 
-    if let Asset::Receipt(r) = asset {
-        if !receipt_has_valid_size(r) {
-            trace!("Receipt metadata is too large");
+    if let Asset::Item(r) = asset {
+        if !item_has_valid_size(r) {
+            trace!("Item metadata is too large");
             return false;
         }
     }
@@ -230,13 +230,13 @@ pub fn tx_has_valid_p2sh_script(script: &Script, address: &str) -> bool {
     false
 }
 
-/// Checks that a receipt's metadata conforms to the network size constraint
+/// Checks that a item's metadata conforms to the network size constraint
 ///
 /// ### Arguments
 ///
-/// * `receipt` - Receipt to check
-fn receipt_has_valid_size(receipt: &ReceiptAsset) -> bool {
-    if let Some(metadata) = &receipt.metadata {
+/// * `item` - Item to check
+fn item_has_valid_size(item: &ItemAsset) -> bool {
+    if let Some(metadata) = &item.metadata {
         return metadata.len() <= MAX_METADATA_BYTES;
     }
     true
@@ -2630,7 +2630,7 @@ mod tests {
     #[test]
     /// Checks that a correct create script is validated as such
     fn test_pass_create_script_valid() {
-        let asset = Asset::receipt(1, None, None);
+        let asset = Asset::item(1, None, None);
         let asset_hash = construct_tx_in_signable_asset_hash(&asset);
         let (pk, sk) = sign::gen_keypair();
         let signature = sign::sign_detached(asset_hash.as_bytes(), &sk);
@@ -2641,9 +2641,9 @@ mod tests {
 
     #[test]
     /// Checks that metadata is validated correctly if too large
-    fn test_fail_create_receipt_script_invalid() {
+    fn test_fail_create_item_script_invalid() {
         let metadata = String::from_utf8_lossy(&[0; MAX_METADATA_BYTES + 1]).to_string();
-        let asset = Asset::receipt(1, None, Some(metadata));
+        let asset = Asset::item(1, None, Some(metadata));
         let asset_hash = construct_tx_in_signable_asset_hash(&asset);
         let (pk, sk) = sign::gen_keypair();
         let signature = sign::sign_detached(asset_hash.as_bytes(), &sk);
@@ -3100,13 +3100,13 @@ mod tests {
     #[test]
     /// ### Test Case 3
     ///
-    ///  - *Receipts only*
+    ///  - *Items only*
     /// -  *Failure*
     ///
-    /// 1. Inputs contain two `TxIn`s for `Receipt`s of amount `3` and `2` with different `drs_tx_hash` values
-    /// 2. Outputs contain `TxOut`s for `Receipt`s of amount `3` and `3`
-    /// 3. `TxIn` DRS matches `TxOut` DRS for `Receipt`s; Amount of `Receipt`s spent does not match    
-    fn test_tx_drs_receipts_only_failure_amount_mismatch() {
+    /// 1. Inputs contain two `TxIn`s for `Item`s of amount `3` and `2` with different `drs_tx_hash` values
+    /// 2. Outputs contain `TxOut`s for `Item`s of amount `3` and `3`
+    /// 3. `TxIn` DRS matches `TxOut` DRS for `Item`s; Amount of `Item`s spent does not match    
+    fn test_tx_drs_items_only_failure_amount_mismatch() {
         test_tx_drs_common(
             &[
                 (3, Some("drs_tx_hash_1"), None),
@@ -3120,13 +3120,13 @@ mod tests {
     #[test]
     /// ### Test Case 4
     ///
-    ///  - *Receipts only*
+    ///  - *Items only*
     /// -  *Failure*
     ///
-    /// 1. Inputs contain two `TxIn`s for `Receipt`s of amount `3` and `2` with different `drs_tx_hash` values
-    /// 2. Outputs contain `TxOut`s for `Receipt`s of amount `3` and `2`
-    /// 3. `TxIn` DRS does not match `TxOut` DRS for `Receipt`s; Amount of `Receipt`s spent matches     
-    fn test_tx_drs_receipts_only_failure_drs_mismatch() {
+    /// 1. Inputs contain two `TxIn`s for `Item`s of amount `3` and `2` with different `drs_tx_hash` values
+    /// 2. Outputs contain `TxOut`s for `Item`s of amount `3` and `2`
+    /// 3. `TxIn` DRS does not match `TxOut` DRS for `Item`s; Amount of `Item`s spent matches     
+    fn test_tx_drs_items_only_failure_drs_mismatch() {
         test_tx_drs_common(
             &[
                 (3, Some("drs_tx_hash_1"), None),
@@ -3140,13 +3140,13 @@ mod tests {
     #[test]
     /// ### Test Case 5
     ///
-    ///  - *Receipts and Tokens*
+    ///  - *Items and Tokens*
     /// -  *Success*
     ///
-    /// 1. Inputs contain two `TxIn`s for `Receipt`s of amount `3` and `Token`s of amount `2`
-    /// 2. Outputs contain `TxOut`s for `Receipt`s of amount `3` and `Token`s of amount `2`
-    /// 3. `TxIn` DRS matches `TxOut` DRS for `Receipt`s; Amount of `Receipt`s and `Token`s spent matches      
-    fn test_tx_drs_receipts_and_tokens_success() {
+    /// 1. Inputs contain two `TxIn`s for `Item`s of amount `3` and `Token`s of amount `2`
+    /// 2. Outputs contain `TxOut`s for `Item`s of amount `3` and `Token`s of amount `2`
+    /// 3. `TxIn` DRS matches `TxOut` DRS for `Item`s; Amount of `Item`s and `Token`s spent matches      
+    fn test_tx_drs_items_and_tokens_success() {
         test_tx_drs_common(
             &[(3, Some("drs_tx_hash"), None), (2, None, None)],
             &[(3, Some("drs_tx_hash")), (2, None)],
@@ -3157,13 +3157,13 @@ mod tests {
     #[test]
     /// ### Test Case 6
     ///
-    ///  - *Receipts and Tokens*
+    ///  - *Items and Tokens*
     /// -  *Failure*
     ///
-    /// 1. Inputs contain two `TxIn`s for `Receipt`s of amount `3` and `Token`s of amount `2`
-    /// 2. Outputs contain `TxOut`s for `Receipt`s of amount `2` and `Token`s of amount `2`
-    /// 3. `TxIn` DRS matches `TxOut` DRS for `Receipt`s; Amount of `Receipt`s spent does not match      
-    fn test_tx_drs_receipts_and_tokens_failure_amount_mismatch() {
+    /// 1. Inputs contain two `TxIn`s for `Item`s of amount `3` and `Token`s of amount `2`
+    /// 2. Outputs contain `TxOut`s for `Item`s of amount `2` and `Token`s of amount `2`
+    /// 3. `TxIn` DRS matches `TxOut` DRS for `Item`s; Amount of `Item`s spent does not match      
+    fn test_tx_drs_items_and_tokens_failure_amount_mismatch() {
         test_tx_drs_common(
             &[(3, Some("drs_tx_hash"), None), (2, None, None)],
             &[(2, Some("drs_tx_hash")), (2, None)],
@@ -3174,14 +3174,14 @@ mod tests {
     #[test]
     /// ### Test Case 7
     ///
-    ///  - *Receipts and Tokens*
+    ///  - *Items and Tokens*
     /// -  *Failure*
     ///
-    /// 1. Inputs contain two `TxIn`s for `Receipt`s of amount `3` and `Token`s of amount `2`
-    /// 2. Outputs contain `TxOut`s for `Receipt`s of amount `1` and Tokens of amount `1`
-    /// 3. `TxIn` DRS does not match `TxOut` DRS for `Receipt`s; Amount of `Receipt`s and `Token`s spent does not match;
+    /// 1. Inputs contain two `TxIn`s for `Item`s of amount `3` and `Token`s of amount `2`
+    /// 2. Outputs contain `TxOut`s for `Item`s of amount `1` and Tokens of amount `1`
+    /// 3. `TxIn` DRS does not match `TxOut` DRS for `Item`s; Amount of `Item`s and `Token`s spent does not match;
     /// Metadata does not match                
-    fn test_tx_drs_receipts_and_tokens_failure_amount_and_drs_mismatch() {
+    fn test_tx_drs_items_and_tokens_failure_amount_and_drs_mismatch() {
         let test_metadata: Option<String> = Some(
             "{\"name\":\"test\",\"description\":\"test\",\"image\":\"test\",\"url\":\"test\"}"
                 .to_string(),

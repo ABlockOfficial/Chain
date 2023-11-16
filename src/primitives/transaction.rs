@@ -2,7 +2,7 @@
 use crate::constants::*;
 use crate::crypto::sign_ed25519::{PublicKey, Signature};
 use crate::primitives::{
-    asset::{Asset, ReceiptAsset, TokenAmount},
+    asset::{Asset, ItemAsset, TokenAmount},
     druid::{DdeValues, DruidExpectation},
 };
 use crate::script::lang::Script;
@@ -134,16 +134,12 @@ impl TxOut {
         }
     }
 
-    /// Creates a new TxOut instance for a `Receipt` asset
+    /// Creates a new TxOut instance for a `Item` asset
     ///
-    /// **NOTE:** Only create transactions may have `Receipt` assets that have a `None` `drs_tx_hash`
-    pub fn new_receipt_amount(
-        to_address: String,
-        receipt: ReceiptAsset,
-        locktime: Option<u64>,
-    ) -> TxOut {
+    /// **NOTE:** Only create transactions may have `Item` assets that have a `None` `drs_tx_hash`
+    pub fn new_item_amount(to_address: String, item: ItemAsset, locktime: Option<u64>) -> TxOut {
         TxOut {
-            value: Asset::Receipt(receipt),
+            value: Asset::Item(item),
             locktime: locktime.unwrap_or(ZERO as u64),
             script_public_key: Some(to_address),
             ..Default::default()
@@ -154,7 +150,7 @@ impl TxOut {
     pub fn new_asset(to_address: String, asset: Asset, locktime: Option<u64>) -> TxOut {
         match asset {
             Asset::Token(amount) => TxOut::new_token_amount(to_address, amount, locktime),
-            Asset::Receipt(receipt) => TxOut::new_receipt_amount(to_address, receipt, locktime),
+            Asset::Item(item) => TxOut::new_item_amount(to_address, item, locktime),
             _ => panic!("Cannot create TxOut for asset of type {:?}", asset),
         }
     }
